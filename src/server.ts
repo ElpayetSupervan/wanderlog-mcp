@@ -160,6 +160,26 @@ import {
   moveNoteDescription,
   moveNoteInputSchema,
 } from "./tools/move-note.js";
+import {
+  listExpenses,
+  listExpensesDescription,
+  listExpensesInputSchema,
+} from "./tools/list-expenses.js";
+import {
+  updateExpense,
+  updateExpenseDescription,
+  updateExpenseInputSchema,
+} from "./tools/update-expense.js";
+import {
+  reorderNote,
+  reorderNoteDescription,
+  reorderNoteInputSchema,
+} from "./tools/reorder-note.js";
+import {
+  getDayBlocks,
+  getDayBlocksDescription,
+  getDayBlocksInputSchema,
+} from "./tools/get-day-blocks.js";
 
 const AUTH_ERROR_RESPONSE = {
   content: [
@@ -549,6 +569,46 @@ export function buildServer(ctx: AppContext): McpServer {
       inputSchema: moveNoteInputSchema,
     },
     requireAuth(ctx, async (args) => moveNote(ctx, args as Parameters<typeof moveNote>[1])),
+  );
+
+  server.registerTool(
+    "wanderlog_list_expenses",
+    {
+      title: "List expenses in a Wanderlog trip",
+      description: listExpensesDescription,
+      inputSchema: listExpensesInputSchema,
+    },
+    requireAuth(ctx, async (args) => listExpenses(ctx, args as Parameters<typeof listExpenses>[1])),
+  );
+
+  server.registerTool(
+    "wanderlog_update_expense",
+    {
+      title: "Update an expense in a Wanderlog trip",
+      description: updateExpenseDescription,
+      inputSchema: updateExpenseInputSchema,
+    },
+    requireAuth(ctx, async (args) => updateExpense(ctx, args as Parameters<typeof updateExpense>[1])),
+  );
+
+  server.registerTool(
+    "wanderlog_reorder_note",
+    {
+      title: "Reorder a note within its day",
+      description: reorderNoteDescription,
+      inputSchema: reorderNoteInputSchema,
+    },
+    requireAuth(ctx, async (args) => reorderNote(ctx, args as Parameters<typeof reorderNote>[1])),
+  );
+
+  server.registerTool(
+    "wanderlog_get_day_blocks",
+    {
+      title: "List all blocks in a day with IDs",
+      description: getDayBlocksDescription,
+      inputSchema: getDayBlocksInputSchema,
+    },
+    requireAuth(ctx, async (args) => getDayBlocks(ctx, args as Parameters<typeof getDayBlocks>[1])),
   );
 
   return server;

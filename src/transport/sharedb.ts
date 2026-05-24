@@ -402,6 +402,14 @@ export class ShareDBPool {
     return this.clients.has(tripKey);
   }
 
+  remove(tripKey: string): void {
+    const client = this.clients.get(tripKey);
+    if (client) {
+      client.close();
+      this.clients.delete(tripKey);
+    }
+  }
+
   closeAll(): void {
     for (const client of this.clients.values()) {
       client.close();

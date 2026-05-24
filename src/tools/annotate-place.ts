@@ -4,6 +4,7 @@ import { WanderlogError, WanderlogValidationError } from "../errors.js";
 import type { Json0Op } from "../ot/apply.js";
 import { resolvePlaceRef } from "../resolvers/place-ref.js";
 import { isPlaceBlock } from "../types.js";
+import type { PlaceBlock } from "../types.js";
 import { submitOp } from "./shared.js";
 
 export const annotatePlaceInputSchema = {
@@ -20,7 +21,11 @@ export const annotatePlaceInputSchema = {
   note: z
     .string()
     .optional()
-    .describe("Set or replace the inline note on this place. Practical context: transit, tips, timing, what to see."),
+    .describe("Inline note content. Practical context: transit, tips, timing, what to see."),
+  note_mode: z
+    .enum(["replace", "append", "prepend"])
+    .optional()
+    .describe("How to apply the note: 'replace' (default) overwrites the existing note, 'append' adds after, 'prepend' adds before."),
   start_time: z
     .string()
     .regex(/^\d{2}:\d{2}$/, "must be HH:mm")
@@ -48,9 +53,15 @@ type Args = {
   trip_key: string;
   place: string;
   note?: string;
+  note_mode?: "replace" | "append" | "prepend";
   start_time?: string;
   end_time?: string;
 };
+
+function extractBlockText(block: PlaceBlock): string {
+  const ops = block.text?.ops ?? [];
+  return ops.map((op) => (typeof op.insert === "string" ? op.insert : "")).join("");
+}
 
 export async function annotatePlace(
   ctx: AppContext,
@@ -95,12 +106,29 @@ export async function annotatePlace(
 
     // Set inline note via rich-text subtype op
     if (args.note) {
+      const mode = args.note_mode ?? "replace";
+      const currentText = isPlaceBlock(block) ? extractBlockText(block as PlaceBlock) : "";
+      const currentLen = currentText.length;
+
+      let deltaOps: Array<Record<string, unknown>>;
+      if (mode === "replace") {
+        deltaOps = currentLen > 0
+          ? [{ delete: currentLen }, { insert: `${args.note}\n` }]
+          : [{ insert: `${args.note}\n` }];
+      } else if (mode === "append") {
+        const insertText = currentText.endsWith("\n")
+          ? `${args.note}\n`
+          : `\n${args.note}\n`;
+        deltaOps = currentLen > 0
+          ? [{ retain: currentLen }, { insert: insertText }]
+          : [{ insert: `${args.note}\n` }];
+      } else {
+        // prepend
+        deltaOps = [{ insert: `${args.note}\n` }];
+      }
+
       const textOps: Json0Op[] = [
-        {
-          p: [...blockPath, "text"],
-          t: "rich-text",
-          o: [{ insert: `${args.note}\n` }],
-        },
+        { p: [...blockPath, "text"], t: "rich-text", o: deltaOps },
       ];
       await submitOp(ctx, args.trip_key, textOps);
     }

@@ -93,6 +93,7 @@ export class TripCache {
 
   invalidate(tripKey: string): void {
     this.entries.delete(tripKey);
+    this.pool.remove(tripKey);
   }
 
   clear(): void {

@@ -15,10 +15,10 @@ export const reorderPlaceInputSchema = {
   position: z
     .union([
       z.enum(["up", "down", "first", "last"]),
-      z.number().int().min(0),
+      z.number().int().min(1),
     ])
     .describe(
-      "Where to move: 'up' (one slot earlier), 'down' (one slot later), 'first', 'last', or a 0-based index.",
+      "Where to move: 'up' (one slot earlier), 'down' (one slot later), 'first', 'last', or a 1-based position number.",
     ),
 };
 
@@ -26,7 +26,7 @@ export const reorderPlaceDescription = `
 Changes the position of a place within its current day/section. Does NOT move between days —
 use wanderlog_move_place for that.
 
-Accepts 'up', 'down', 'first', 'last', or a numeric 0-based index.
+Accepts 'up', 'down', 'first', 'last', or a 1-based position number (1 = first place in the day).
 If the reference is ambiguous, returns candidates without making changes.
 `.trim();
 
@@ -77,7 +77,7 @@ export async function reorderPlace(
     } else if (args.position === "last") {
       targetIndex = blockCount - 1;
     } else {
-      targetIndex = Math.min(Math.max(0, args.position), blockCount - 1);
+      targetIndex = Math.min(Math.max(0, args.position - 1), blockCount - 1);
     }
 
     if (targetIndex === blockIndex) {

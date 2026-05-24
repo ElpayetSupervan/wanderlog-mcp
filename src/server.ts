@@ -110,6 +110,56 @@ import {
   movePlaceDescription,
   movePlaceInputSchema,
 } from "./tools/move-place.js";
+import {
+  editChecklist,
+  editChecklistDescription,
+  editChecklistInputSchema,
+} from "./tools/edit-checklist.js";
+import {
+  reorderPlace,
+  reorderPlaceDescription,
+  reorderPlaceInputSchema,
+} from "./tools/reorder-place.js";
+import {
+  removeExpense,
+  removeExpenseDescription,
+  removeExpenseInputSchema,
+} from "./tools/remove-expense.js";
+import {
+  addFlight,
+  addFlightDescription,
+  addFlightInputSchema,
+} from "./tools/add-flight.js";
+import {
+  removeFlight,
+  removeFlightDescription,
+  removeFlightInputSchema,
+} from "./tools/remove-flight.js";
+import {
+  addTrain,
+  addTrainDescription,
+  addTrainInputSchema,
+} from "./tools/add-train.js";
+import {
+  removeTrain,
+  removeTrainDescription,
+  removeTrainInputSchema,
+} from "./tools/remove-train.js";
+import {
+  renameTrip,
+  renameTripDescription,
+  renameTripInputSchema,
+} from "./tools/rename-trip.js";
+import {
+  updateTripPrivacy,
+  updateTripPrivacyDescription,
+  updateTripPrivacyInputSchema,
+} from "./tools/update-trip-privacy.js";
+import {
+  moveNote,
+  moveNoteDescription,
+  moveNoteInputSchema,
+} from "./tools/move-note.js";
 
 const AUTH_ERROR_RESPONSE = {
   content: [
@@ -399,6 +449,106 @@ export function buildServer(ctx: AppContext): McpServer {
       inputSchema: movePlaceInputSchema,
     },
     requireAuth(ctx, async (args) => movePlace(ctx, args as Parameters<typeof movePlace>[1])),
+  );
+
+  server.registerTool(
+    "wanderlog_edit_checklist",
+    {
+      title: "Edit a checklist in a Wanderlog trip",
+      description: editChecklistDescription,
+      inputSchema: editChecklistInputSchema,
+    },
+    requireAuth(ctx, async (args) => editChecklist(ctx, args as Parameters<typeof editChecklist>[1])),
+  );
+
+  server.registerTool(
+    "wanderlog_reorder_place",
+    {
+      title: "Reorder a place within its day",
+      description: reorderPlaceDescription,
+      inputSchema: reorderPlaceInputSchema,
+    },
+    requireAuth(ctx, async (args) => reorderPlace(ctx, args as Parameters<typeof reorderPlace>[1])),
+  );
+
+  server.registerTool(
+    "wanderlog_remove_expense",
+    {
+      title: "Remove an expense from a Wanderlog trip",
+      description: removeExpenseDescription,
+      inputSchema: removeExpenseInputSchema,
+    },
+    requireAuth(ctx, async (args) => removeExpense(ctx, args as Parameters<typeof removeExpense>[1])),
+  );
+
+  server.registerTool(
+    "wanderlog_add_flight",
+    {
+      title: "Add a flight to a Wanderlog trip",
+      description: addFlightDescription,
+      inputSchema: addFlightInputSchema,
+    },
+    requireAuth(ctx, async (args) => addFlight(ctx, args as Parameters<typeof addFlight>[1])),
+  );
+
+  server.registerTool(
+    "wanderlog_remove_flight",
+    {
+      title: "Remove a flight from a Wanderlog trip",
+      description: removeFlightDescription,
+      inputSchema: removeFlightInputSchema,
+    },
+    requireAuth(ctx, async (args) => removeFlight(ctx, args as Parameters<typeof removeFlight>[1])),
+  );
+
+  server.registerTool(
+    "wanderlog_add_train",
+    {
+      title: "Add a train to a Wanderlog trip",
+      description: addTrainDescription,
+      inputSchema: addTrainInputSchema,
+    },
+    requireAuth(ctx, async (args) => addTrain(ctx, args as Parameters<typeof addTrain>[1])),
+  );
+
+  server.registerTool(
+    "wanderlog_remove_train",
+    {
+      title: "Remove a train from a Wanderlog trip",
+      description: removeTrainDescription,
+      inputSchema: removeTrainInputSchema,
+    },
+    requireAuth(ctx, async (args) => removeTrain(ctx, args as Parameters<typeof removeTrain>[1])),
+  );
+
+  server.registerTool(
+    "wanderlog_rename_trip",
+    {
+      title: "Rename a Wanderlog trip",
+      description: renameTripDescription,
+      inputSchema: renameTripInputSchema,
+    },
+    requireAuth(ctx, async (args) => renameTrip(ctx, args as Parameters<typeof renameTrip>[1])),
+  );
+
+  server.registerTool(
+    "wanderlog_update_trip_privacy",
+    {
+      title: "Change privacy of a Wanderlog trip",
+      description: updateTripPrivacyDescription,
+      inputSchema: updateTripPrivacyInputSchema,
+    },
+    requireAuth(ctx, async (args) => updateTripPrivacy(ctx, args as Parameters<typeof updateTripPrivacy>[1])),
+  );
+
+  server.registerTool(
+    "wanderlog_move_note",
+    {
+      title: "Move a note to a different day",
+      description: moveNoteDescription,
+      inputSchema: moveNoteInputSchema,
+    },
+    requireAuth(ctx, async (args) => moveNote(ctx, args as Parameters<typeof moveNote>[1])),
   );
 
   return server;

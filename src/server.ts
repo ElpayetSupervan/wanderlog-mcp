@@ -1,6 +1,11 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { AppContext } from "./context.js";
 import {
+  expenses,
+  expensesDescription,
+  expensesInputSchema,
+} from "./tools/expenses.js";
+import {
   addChecklist,
   addChecklistDescription,
   addChecklistInputSchema,
@@ -317,21 +322,9 @@ export function buildServer(ctx: AppContext, options?: { tier?: Tier }): McpServ
   );
 
   server.registerTool(
-    "wanderlog_remove_expense",
-    { title: "Remove expense(s) by id/description/place", description: removeExpenseDescription, inputSchema: removeExpenseInputSchema },
-    requireAuth(ctx, async (args) => removeExpense(ctx, args as Parameters<typeof removeExpense>[1])),
-  );
-
-  server.registerTool(
-    "wanderlog_list_expenses",
-    { title: "List expenses with orphan detection", description: listExpensesDescription, inputSchema: listExpensesInputSchema },
-    requireAuth(ctx, async (args) => listExpenses(ctx, args as Parameters<typeof listExpenses>[1])),
-  );
-
-  server.registerTool(
-    "wanderlog_update_expense",
-    { title: "Update an expense (amount/place/category)", description: updateExpenseDescription, inputSchema: updateExpenseInputSchema },
-    requireAuth(ctx, async (args) => updateExpense(ctx, args as Parameters<typeof updateExpense>[1])),
+    "wanderlog_expenses",
+    { title: "Manage expenses (list/remove/update)", description: expensesDescription, inputSchema: expensesInputSchema },
+    requireAuth(ctx, async (args) => expenses(ctx, args as Parameters<typeof expenses>[1])),
   );
 
   server.registerTool(
@@ -356,12 +349,6 @@ export function buildServer(ctx: AppContext, options?: { tier?: Tier }): McpServ
     "wanderlog_add_checklist",
     { title: "Add a checklist to a trip", description: addChecklistDescription, inputSchema: addChecklistInputSchema },
     requireAuth(ctx, async (args) => addChecklist(ctx, args as Parameters<typeof addChecklist>[1])),
-  );
-
-  server.registerTool(
-    "wanderlog_get_day_blocks",
-    { title: "Audit: list all blocks with IDs for a day", description: getDayBlocksDescription, inputSchema: getDayBlocksInputSchema },
-    requireAuth(ctx, async (args) => getDayBlocks(ctx, args as Parameters<typeof getDayBlocks>[1])),
   );
 
   server.registerTool(

@@ -3,6 +3,23 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { createContext } from "./context.js";
 import { WanderlogError } from "./errors.js";
 import { buildServer } from "./server.js";
+import type { Tier } from "./server.js";
+
+function parseTier(): Tier {
+  const arg = process.argv.find((a) => a.startsWith("--tier="));
+  if (arg) {
+    const val = arg.split("=")[1];
+    if (val === "1" || val === "2") return Number(val) as Tier;
+  }
+  const idx = process.argv.indexOf("--tier");
+  if (idx >= 0 && process.argv[idx + 1]) {
+    const val = process.argv[idx + 1];
+    if (val === "1" || val === "2") return Number(val) as Tier;
+  }
+  const env = process.env.WANDERLOG_TIER;
+  if (env === "1" || env === "2") return Number(env) as Tier;
+  return undefined;
+}
 
 async function main() {
   let ctx;
@@ -35,7 +52,8 @@ async function main() {
     );
   }
 
-  const server = buildServer(ctx);
+  const tier = parseTier();
+  const server = buildServer(ctx, { tier });
   const transport = new StdioServerTransport();
 
   const shutdown = async (signal: string) => {

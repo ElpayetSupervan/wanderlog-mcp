@@ -236,17 +236,25 @@ Example add_place call with all features:
 Places without notes and times are just pins on a map. Rich places make an itinerary useful.
 `.trim();
 
-export function buildServer(ctx: AppContext): McpServer {
+export type Tier = 1 | 2 | undefined;
+
+export function buildServer(ctx: AppContext, options?: { tier?: Tier }): McpServer {
+  const tier = options?.tier;
+  const includeTier1 = tier === undefined || tier === 1;
+  const includeTier2 = tier === undefined || tier === 2;
+  const serverName = tier === 2 ? "wanderlog-mcp-extra" : "wanderlog-mcp";
+
   const server = new McpServer(
-    { name: "wanderlog-mcp", version: "0.2.0" },
+    { name: serverName, version: "0.2.0" },
     { instructions: SERVER_INSTRUCTIONS },
   );
 
   // ═══════════════════════════════════════════════════════════════════
-  // PRIORITY TIER 1 — Core tools (positions 1-20)
-  // Claude Desktop has a ~20 tool display limit per MCP server.
-  // These are registered first to guarantee availability.
+  // TIER 1 — Core tools (20 tools)
+  // Registered via --tier=1 or WANDERLOG_TIER=1 (or both if no tier set)
   // ═══════════════════════════════════════════════════════════════════
+
+  if (includeTier1) {
 
   server.registerTool(
     "wanderlog_list_trips",
@@ -368,227 +376,80 @@ export function buildServer(ctx: AppContext): McpServer {
     requireAuth(ctx, async (args) => updateTripDates(ctx, args as Parameters<typeof updateTripDates>[1])),
   );
 
+  } // end tier 1
+
   // ═══════════════════════════════════════════════════════════════════
-  // TIER 2 — Secondary tools (may be truncated by Claude Desktop)
-  // Still available in Claude Code and other MCP clients.
+  // TIER 2 — Secondary tools (16 tools)
+  // Registered via --tier=2 or WANDERLOG_TIER=2 (or both if no tier set)
   // ═══════════════════════════════════════════════════════════════════
 
-  server.registerTool(
-    "wanderlog_rename_day",
+  if (includeTier2) {
+
+  server.registerTool("wanderlog_rename_day",
     { title: "Rename a day heading", description: renameDayDescription, inputSchema: renameDayInputSchema },
-    requireAuth(ctx, async (args) => renameDay(ctx, args as Parameters<typeof renameDay>[1])),
-  );
+    requireAuth(ctx, async (args) => renameDay(ctx, args as Parameters<typeof renameDay>[1])));
 
-  server.registerTool(
-    "wanderlog_edit_note",
+  server.registerTool("wanderlog_edit_note",
     { title: "Edit note content", description: editNoteDescription, inputSchema: editNoteInputSchema },
-    requireAuth(ctx, async (args) => editNote(ctx, args as Parameters<typeof editNote>[1])),
-  );
+    requireAuth(ctx, async (args) => editNote(ctx, args as Parameters<typeof editNote>[1])));
 
-  server.registerTool(
-    "wanderlog_move_note",
+  server.registerTool("wanderlog_move_note",
     { title: "Move a note between days", description: moveNoteDescription, inputSchema: moveNoteInputSchema },
-    requireAuth(ctx, async (args) => moveNote(ctx, args as Parameters<typeof moveNote>[1])),
-  );
+    requireAuth(ctx, async (args) => moveNote(ctx, args as Parameters<typeof moveNote>[1])));
 
-  server.registerTool(
-    "wanderlog_reorder_note",
+  server.registerTool("wanderlog_reorder_note",
     { title: "Reorder a note within its day", description: reorderNoteDescription, inputSchema: reorderNoteInputSchema },
-    requireAuth(ctx, async (args) => reorderNote(ctx, args as Parameters<typeof reorderNote>[1])),
-  );
+    requireAuth(ctx, async (args) => reorderNote(ctx, args as Parameters<typeof reorderNote>[1])));
 
-  server.registerTool(
-    "wanderlog_search_guides",
+  server.registerTool("wanderlog_search_guides",
     { title: "Search travel guides", description: searchGuidesDescription, inputSchema: searchGuidesInputSchema },
-    requireAuth(ctx, async (args) => searchGuides(ctx, args as Parameters<typeof searchGuides>[1])),
-  );
+    requireAuth(ctx, async (args) => searchGuides(ctx, args as Parameters<typeof searchGuides>[1])));
 
-  server.registerTool(
-    "wanderlog_get_guide",
+  server.registerTool("wanderlog_get_guide",
     { title: "Read a travel guide", description: getGuideDescription, inputSchema: getGuideInputSchema },
-    requireAuth(ctx, async (args) => getGuide(ctx, args as Parameters<typeof getGuide>[1])),
-  );
+    requireAuth(ctx, async (args) => getGuide(ctx, args as Parameters<typeof getGuide>[1])));
 
-  server.registerTool(
-    "wanderlog_delete_trip",
-    {
-      title: "Delete a Wanderlog trip",
-      description: deleteTripDescription,
-      inputSchema: deleteTripInputSchema,
-    },
-    requireAuth(ctx, async (args) => deleteTrip(ctx, args as Parameters<typeof deleteTrip>[1])),
-  );
+  server.registerTool("wanderlog_delete_trip",
+    { title: "Delete a trip", description: deleteTripDescription, inputSchema: deleteTripInputSchema },
+    requireAuth(ctx, async (args) => deleteTrip(ctx, args as Parameters<typeof deleteTrip>[1])));
 
-  server.registerTool(
-    "wanderlog_remove_hotel",
-    {
-      title: "Remove a hotel from a Wanderlog trip",
-      description: removeHotelDescription,
-      inputSchema: removeHotelInputSchema,
-    },
-    requireAuth(ctx, async (args) => removeHotel(ctx, args as Parameters<typeof removeHotel>[1])),
-  );
+  server.registerTool("wanderlog_remove_hotel",
+    { title: "Remove a hotel", description: removeHotelDescription, inputSchema: removeHotelInputSchema },
+    requireAuth(ctx, async (args) => removeHotel(ctx, args as Parameters<typeof removeHotel>[1])));
 
-  server.registerTool(
-    "wanderlog_remove_checklist",
-    {
-      title: "Remove a checklist from a Wanderlog trip",
-      description: removeChecklistDescription,
-      inputSchema: removeChecklistInputSchema,
-    },
-    requireAuth(ctx, async (args) =>
-      removeChecklist(ctx, args as Parameters<typeof removeChecklist>[1])),
-  );
+  server.registerTool("wanderlog_remove_checklist",
+    { title: "Remove a checklist", description: removeChecklistDescription, inputSchema: removeChecklistInputSchema },
+    requireAuth(ctx, async (args) => removeChecklist(ctx, args as Parameters<typeof removeChecklist>[1])));
 
-  server.registerTool(
-    "wanderlog_move_place",
-    {
-      title: "Move a place to a different day",
-      description: movePlaceDescription,
-      inputSchema: movePlaceInputSchema,
-    },
-    requireAuth(ctx, async (args) => movePlace(ctx, args as Parameters<typeof movePlace>[1])),
-  );
+  server.registerTool("wanderlog_edit_checklist",
+    { title: "Edit checklist items", description: editChecklistDescription, inputSchema: editChecklistInputSchema },
+    requireAuth(ctx, async (args) => editChecklist(ctx, args as Parameters<typeof editChecklist>[1])));
 
-  server.registerTool(
-    "wanderlog_edit_checklist",
-    {
-      title: "Edit a checklist in a Wanderlog trip",
-      description: editChecklistDescription,
-      inputSchema: editChecklistInputSchema,
-    },
-    requireAuth(ctx, async (args) => editChecklist(ctx, args as Parameters<typeof editChecklist>[1])),
-  );
+  server.registerTool("wanderlog_add_flight",
+    { title: "Add a flight", description: addFlightDescription, inputSchema: addFlightInputSchema },
+    requireAuth(ctx, async (args) => addFlight(ctx, args as Parameters<typeof addFlight>[1])));
 
-  server.registerTool(
-    "wanderlog_reorder_place",
-    {
-      title: "Reorder a place within its day",
-      description: reorderPlaceDescription,
-      inputSchema: reorderPlaceInputSchema,
-    },
-    requireAuth(ctx, async (args) => reorderPlace(ctx, args as Parameters<typeof reorderPlace>[1])),
-  );
+  server.registerTool("wanderlog_remove_flight",
+    { title: "Remove a flight", description: removeFlightDescription, inputSchema: removeFlightInputSchema },
+    requireAuth(ctx, async (args) => removeFlight(ctx, args as Parameters<typeof removeFlight>[1])));
 
-  server.registerTool(
-    "wanderlog_remove_expense",
-    {
-      title: "Remove an expense from a Wanderlog trip",
-      description: removeExpenseDescription,
-      inputSchema: removeExpenseInputSchema,
-    },
-    requireAuth(ctx, async (args) => removeExpense(ctx, args as Parameters<typeof removeExpense>[1])),
-  );
+  server.registerTool("wanderlog_add_train",
+    { title: "Add a train", description: addTrainDescription, inputSchema: addTrainInputSchema },
+    requireAuth(ctx, async (args) => addTrain(ctx, args as Parameters<typeof addTrain>[1])));
 
-  server.registerTool(
-    "wanderlog_add_flight",
-    {
-      title: "Add a flight to a Wanderlog trip",
-      description: addFlightDescription,
-      inputSchema: addFlightInputSchema,
-    },
-    requireAuth(ctx, async (args) => addFlight(ctx, args as Parameters<typeof addFlight>[1])),
-  );
+  server.registerTool("wanderlog_remove_train",
+    { title: "Remove a train", description: removeTrainDescription, inputSchema: removeTrainInputSchema },
+    requireAuth(ctx, async (args) => removeTrain(ctx, args as Parameters<typeof removeTrain>[1])));
 
-  server.registerTool(
-    "wanderlog_remove_flight",
-    {
-      title: "Remove a flight from a Wanderlog trip",
-      description: removeFlightDescription,
-      inputSchema: removeFlightInputSchema,
-    },
-    requireAuth(ctx, async (args) => removeFlight(ctx, args as Parameters<typeof removeFlight>[1])),
-  );
+  server.registerTool("wanderlog_rename_trip",
+    { title: "Rename a trip", description: renameTripDescription, inputSchema: renameTripInputSchema },
+    requireAuth(ctx, async (args) => renameTrip(ctx, args as Parameters<typeof renameTrip>[1])));
 
-  server.registerTool(
-    "wanderlog_add_train",
-    {
-      title: "Add a train to a Wanderlog trip",
-      description: addTrainDescription,
-      inputSchema: addTrainInputSchema,
-    },
-    requireAuth(ctx, async (args) => addTrain(ctx, args as Parameters<typeof addTrain>[1])),
-  );
+  server.registerTool("wanderlog_update_trip_privacy",
+    { title: "Change trip privacy", description: updateTripPrivacyDescription, inputSchema: updateTripPrivacyInputSchema },
+    requireAuth(ctx, async (args) => updateTripPrivacy(ctx, args as Parameters<typeof updateTripPrivacy>[1])));
 
-  server.registerTool(
-    "wanderlog_remove_train",
-    {
-      title: "Remove a train from a Wanderlog trip",
-      description: removeTrainDescription,
-      inputSchema: removeTrainInputSchema,
-    },
-    requireAuth(ctx, async (args) => removeTrain(ctx, args as Parameters<typeof removeTrain>[1])),
-  );
-
-  server.registerTool(
-    "wanderlog_rename_trip",
-    {
-      title: "Rename a Wanderlog trip",
-      description: renameTripDescription,
-      inputSchema: renameTripInputSchema,
-    },
-    requireAuth(ctx, async (args) => renameTrip(ctx, args as Parameters<typeof renameTrip>[1])),
-  );
-
-  server.registerTool(
-    "wanderlog_update_trip_privacy",
-    {
-      title: "Change privacy of a Wanderlog trip",
-      description: updateTripPrivacyDescription,
-      inputSchema: updateTripPrivacyInputSchema,
-    },
-    requireAuth(ctx, async (args) => updateTripPrivacy(ctx, args as Parameters<typeof updateTripPrivacy>[1])),
-  );
-
-  server.registerTool(
-    "wanderlog_move_note",
-    {
-      title: "Move a note to a different day",
-      description: moveNoteDescription,
-      inputSchema: moveNoteInputSchema,
-    },
-    requireAuth(ctx, async (args) => moveNote(ctx, args as Parameters<typeof moveNote>[1])),
-  );
-
-  server.registerTool(
-    "wanderlog_list_expenses",
-    {
-      title: "List expenses in a Wanderlog trip",
-      description: listExpensesDescription,
-      inputSchema: listExpensesInputSchema,
-    },
-    requireAuth(ctx, async (args) => listExpenses(ctx, args as Parameters<typeof listExpenses>[1])),
-  );
-
-  server.registerTool(
-    "wanderlog_update_expense",
-    {
-      title: "Update an expense in a Wanderlog trip",
-      description: updateExpenseDescription,
-      inputSchema: updateExpenseInputSchema,
-    },
-    requireAuth(ctx, async (args) => updateExpense(ctx, args as Parameters<typeof updateExpense>[1])),
-  );
-
-  server.registerTool(
-    "wanderlog_reorder_note",
-    {
-      title: "Reorder a note within its day",
-      description: reorderNoteDescription,
-      inputSchema: reorderNoteInputSchema,
-    },
-    requireAuth(ctx, async (args) => reorderNote(ctx, args as Parameters<typeof reorderNote>[1])),
-  );
-
-  server.registerTool(
-    "wanderlog_get_day_blocks",
-    {
-      title: "List all blocks in a day with IDs",
-      description: getDayBlocksDescription,
-      inputSchema: getDayBlocksInputSchema,
-    },
-    requireAuth(ctx, async (args) => getDayBlocks(ctx, args as Parameters<typeof getDayBlocks>[1])),
-  );
+  } // end tier 2
 
   return server;
 }

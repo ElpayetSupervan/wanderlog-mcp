@@ -14,6 +14,20 @@ import type {
 
 export type ResponseFormat = "concise" | "detailed";
 
+export type FormatOptions = {
+  includeOrphans?: boolean;
+};
+
+type ExpenseEntry = {
+  id: number;
+  amount: { amount: number; currencyCode: string };
+  category: string;
+  description: string;
+  date: string;
+  blockId?: number;
+  associatedDate?: string;
+};
+
 export function formatTripList(
   trips: TripPlanSummary[],
   format: ResponseFormat,
@@ -50,27 +64,71 @@ export function formatTrip(
   trip: TripPlan,
   format: ResponseFormat,
   dayFilter?: Section,
+  options?: FormatOptions,
 ): string {
-  if (dayFilter) return formatDay(trip, dayFilter, format);
+  const expenses = getExpenses(trip);
+  const blockIds = getAllBlockIds(trip);
+
+  if (dayFilter) return formatDay(trip, dayFilter, format, expenses);
 
   const parts: string[] = [formatTripHeader(trip, format)];
 
   for (const section of trip.itinerary.sections) {
-    const rendered = renderSection(section, format);
+    const rendered = renderSection(section, format, expenses);
     if (rendered) parts.push("", rendered);
+  }
+
+  // Orphan expenses section
+  if (options?.includeOrphans && expenses.length > 0) {
+    const orphans = expenses.filter(
+      (e) => !e.blockId || !blockIds.has(e.blockId),
+    );
+    if (orphans.length > 0) {
+      parts.push("", formatOrphanExpenses(orphans));
+    }
   }
 
   return parts.join("\n");
 }
 
-function renderSection(section: Section, format: ResponseFormat): string | null {
+function getExpenses(trip: TripPlan): ExpenseEntry[] {
+  const budget = (trip.itinerary as Record<string, unknown>).budget as
+    | Record<string, unknown>
+    | undefined;
+  return (budget?.expenses as ExpenseEntry[] | undefined) ?? [];
+}
+
+function getAllBlockIds(trip: TripPlan): Set<number> {
+  const ids = new Set<number>();
+  for (const section of trip.itinerary.sections) {
+    for (const block of section.blocks) {
+      ids.add(block.id);
+    }
+  }
+  return ids;
+}
+
+function formatOrphanExpenses(orphans: ExpenseEntry[]): string {
+  const lines = orphans.map((e) => {
+    const cur = e.amount.currencyCode;
+    const day = e.associatedDate || e.date || "?";
+    return `  • [ORPHAN] ${cur} ${e.amount.amount} [${e.category}] — "${e.description}" (id: ${e.id}, was on ${day})`;
+  });
+  return `📦 ORPHAN EXPENSES (no longer linked to a place):\n${lines.join("\n")}`;
+}
+
+function getExpensesForBlock(blockId: number, expenses: ExpenseEntry[]): ExpenseEntry[] {
+  return expenses.filter((e) => e.blockId === blockId);
+}
+
+function renderSection(section: Section, format: ResponseFormat, expenses: ExpenseEntry[]): string | null {
   if (section.mode === "dayPlan" && section.date) {
-    return renderDaySection(section, format);
+    return renderDaySection(section, format, expenses);
   }
 
   const sectionText = section.text ? quillToPlain(section.text).trim() : "";
   const blockLines = (section.blocks ?? [])
-    .map((b) => formatBlockLine(b, format))
+    .map((b) => formatBlockWithExpenses(b, format, expenses))
     .filter(Boolean) as string[];
 
   if (!sectionText && blockLines.length === 0) return null;
@@ -80,20 +138,55 @@ function renderSection(section: Section, format: ResponseFormat): string | null 
   const parts = [`${icon} ${heading}`];
   if (sectionText) parts.push(sectionText);
   if (blockLines.length > 0) {
-    parts.push(blockLines.map((l) => `  • ${l}`).join("\n"));
+    parts.push(blockLines.join("\n"));
   }
   return parts.join("\n");
 }
 
-function renderDaySection(section: Section, format: ResponseFormat): string {
+function renderDaySection(section: Section, format: ResponseFormat, expenses: ExpenseEntry[]): string {
   const label = formatDayLabel(section);
   if (section.blocks.length === 0) {
     return `📅 ${label}\n  (no plans)`;
   }
-  const lines = section.blocks
-    .map((b) => formatBlockLine(b, format))
-    .filter(Boolean) as string[];
-  return `📅 ${label}\n${lines.map((l) => `  • ${l}`).join("\n")}`;
+
+  let noteCounter = 0;
+  const lines: string[] = [];
+
+  for (const block of section.blocks) {
+    if (block.type === "note") {
+      noteCounter++;
+    }
+    const line = formatBlockWithExpenses(block, format, expenses, block.type === "note" ? noteCounter : undefined);
+    if (line) lines.push(line);
+  }
+
+  return `📅 ${label}\n${lines.join("\n")}`;
+}
+
+function formatBlockWithExpenses(
+  block: Block,
+  format: ResponseFormat,
+  expenses: ExpenseEntry[],
+  notePosition?: number,
+): string | null {
+  const mainLine = formatBlockLine(block, format, notePosition);
+  if (!mainLine) return null;
+
+  const prefixed = `  • ${mainLine}`;
+
+  // In detailed mode, show expenses under place blocks
+  if (format === "detailed" && block.type === "place") {
+    const blockExpenses = getExpensesForBlock(block.id, expenses);
+    if (blockExpenses.length > 0) {
+      const expenseLines = blockExpenses.map((e) => {
+        const cur = e.amount.currencyCode;
+        return `      💰 ${cur} ${e.amount.amount} [${e.category}] — "${e.description}" (id: ${e.id})`;
+      });
+      return prefixed + "\n" + expenseLines.join("\n");
+    }
+  }
+
+  return prefixed;
 }
 
 function sectionIcon(section: Section): string {
@@ -101,7 +194,7 @@ function sectionIcon(section: Section): string {
     case "hotels":
       return "🏨";
     case "flights":
-      return "✈";
+      return "���";
     case "transit":
       return "🚆";
     case "textOnly":
@@ -139,29 +232,48 @@ function formatDay(
   trip: TripPlan,
   section: Section,
   format: ResponseFormat,
+  expenses: ExpenseEntry[],
 ): string {
   const label = formatDayLabel(section);
   const header = `${trip.title} — ${label}`;
   if (section.blocks.length === 0) {
     return `${header}\n(no plans for this day yet)`;
   }
-  const lines = section.blocks
-    .map((b) => formatBlockLine(b, format))
-    .filter(Boolean) as string[];
-  return `${header}\n${lines.map((l) => `• ${l}`).join("\n")}`;
+
+  let noteCounter = 0;
+  const lines: string[] = [];
+  for (const block of section.blocks) {
+    if (block.type === "note") noteCounter++;
+    const line = formatBlockLine(block, format, block.type === "note" ? noteCounter : undefined);
+    if (!line) continue;
+
+    let output = `• ${line}`;
+    if (format === "detailed" && block.type === "place") {
+      const blockExpenses = getExpensesForBlock(block.id, expenses);
+      if (blockExpenses.length > 0) {
+        const expLines = blockExpenses.map((e) => {
+          const cur = e.amount.currencyCode;
+          return `    💰 ${cur} ${e.amount.amount} [${e.category}] — "${e.description}" (id: ${e.id})`;
+        });
+        output += "\n" + expLines.join("\n");
+      }
+    }
+    lines.push(output);
+  }
+  return `${header}\n${lines.join("\n")}`;
 }
 
 /**
  * Renders any block as a single line. Never throws on unknown shapes —
  * falls back to a best-effort description.
  */
-export function formatBlockLine(block: Block, format: ResponseFormat): string | null {
+export function formatBlockLine(block: Block, format: ResponseFormat, notePosition?: number): string | null {
   try {
     switch (block.type) {
       case "place":
         return formatPlaceBlock(block as PlaceBlock, format);
       case "note":
-        return formatNoteBlock(block as NoteBlock, format);
+        return formatNoteBlock(block as NoteBlock, format, notePosition);
       case "checklist":
         return formatChecklistBlock(block as ChecklistBlock, format);
       case "flight":
@@ -213,15 +325,22 @@ function formatPlaceBlock(block: PlaceBlock, format: ResponseFormat): string | n
   return parts.join(" · ");
 }
 
-function formatNoteBlock(block: NoteBlock, format: ResponseFormat): string | null {
+function formatNoteBlock(block: NoteBlock, format: ResponseFormat, position?: number): string | null {
   const text = quillToPlain(block.text);
-  if (!text) return null;
   const oneLine = text.replace(/\s+/g, " ").trim();
+  const posLabel = position != null ? `[${position}] ` : "";
+
+  if (!oneLine) {
+    // Show empty notes in detailed mode so they can be targeted by position
+    if (format === "detailed") return `📝 ${posLabel}(empty)`;
+    return null;
+  }
+
   if (format === "concise") {
     const truncated = oneLine.length > 200 ? `${oneLine.slice(0, 197)}…` : oneLine;
     return `📝 ${truncated}`;
   }
-  return `📝 ${oneLine}`;
+  return `📝 ${posLabel}${oneLine}`;
 }
 
 function formatChecklistBlock(block: ChecklistBlock, format: ResponseFormat): string | null {
@@ -293,7 +412,7 @@ function formatTrainBlock(block: TrainBlock, format: ResponseFormat): string {
     `${departDate}${departTime} → ${block.arrive?.date ?? ""}${block.arrive?.time ? ` ${block.arrive.time}` : ""}`,
   ];
   if (block.confirmationNumber) parts.push(`conf. ${block.confirmationNumber}`);
-  return parts.join(" · ");
+  return parts.join(" �� ");
 }
 
 function formatUnknownBlock(block: UnknownBlock): string {
@@ -307,7 +426,6 @@ function formatAirport(endpoint: FlightBlock["depart"]): string {
 }
 
 function formatTime(iso: string): string {
-  // ISO times like "2025-11-13T09:00:00Z" or "09:00" — keep it tolerant.
   const match = /(\d{2}:\d{2})/.exec(iso);
   return match ? match[1]! : iso;
 }

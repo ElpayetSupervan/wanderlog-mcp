@@ -42,27 +42,54 @@ async function withSubmitLock<T>(
  *   next read refetches a fresh snapshot from the server.
  * - On success, cache.applyLocalOp() is called with the server-accepted version.
  */
+const RETRYABLE_ERRORS = ["submit_timeout", "ws_error", "ws_closed", "ot_path_invalid"];
+const MAX_RETRIES = 2;
+const RETRY_DELAYS = [500, 1500];
+
+async function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 export async function submitOp(
   ctx: AppContext,
   tripKey: string,
   ops: Json0Op[],
 ): Promise<void> {
   return withSubmitLock(tripKey, async () => {
-    const client = ctx.pool.get(tripKey);
-    if (!client.isSubscribed) {
-      throw new WanderlogError(
-        `Trip ${tripKey} is not subscribed — call tripCache.get() first`,
-        "not_subscribed",
-      );
-    }
-    try {
-      await client.submit(ops);
-      ctx.tripCache.applyLocalOp(tripKey, ops, client.version);
-    } catch (err) {
-      // Any submit failure leaves our cached view possibly inconsistent with
-      // the server. Invalidate so the next get() refetches + resubscribes.
-      ctx.tripCache.invalidate(tripKey);
-      throw err;
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+      const client = ctx.pool.get(tripKey);
+      if (!client.isSubscribed) {
+        // Re-subscribe after invalidation from a previous failed attempt
+        await ctx.tripCache.get(tripKey);
+        const freshClient = ctx.pool.get(tripKey);
+        if (!freshClient.isSubscribed) {
+          throw new WanderlogError(
+            `Trip ${tripKey} is not subscribed — call tripCache.get() first`,
+            "not_subscribed",
+          );
+        }
+      }
+
+      const currentClient = ctx.pool.get(tripKey);
+      try {
+        await currentClient.submit(ops);
+        ctx.tripCache.applyLocalOp(tripKey, ops, currentClient.version);
+        return;
+      } catch (err) {
+        ctx.tripCache.invalidate(tripKey);
+
+        const code = err instanceof WanderlogError ? err.code : "";
+        const isRetryable = RETRYABLE_ERRORS.includes(code) ||
+          (err instanceof Error && /timeout|conflict|out of bounds/i.test(err.message));
+
+        if (isRetryable && attempt < MAX_RETRIES) {
+          await sleep(RETRY_DELAYS[attempt]!);
+          // Re-fetch fresh snapshot before retry
+          await ctx.tripCache.get(tripKey);
+          continue;
+        }
+        throw err;
+      }
     }
   });
 }

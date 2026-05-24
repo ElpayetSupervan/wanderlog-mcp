@@ -21,8 +21,12 @@ export const getTripInputSchema = {
     .enum(["concise", "detailed"])
     .default("concise")
     .describe(
-      "Output verbosity. 'concise' (default) is a readable summary grouped by day; 'detailed' adds addresses, phone numbers, ratings, and check-in dates.",
+      "Output verbosity. 'concise' (default) is a readable summary grouped by day; 'detailed' adds addresses, phone numbers, ratings, check-in dates, expenses under each place, note positions, and orphan expenses.",
     ),
+  include_orphans: z
+    .boolean()
+    .optional()
+    .describe("Show orphan expenses (linked to deleted places) at the end. Default: true in detailed, false in concise."),
 };
 
 export const getTripDescription = `
@@ -40,6 +44,7 @@ type Args = {
   trip_key: string;
   day?: string;
   response_format?: "concise" | "detailed";
+  include_orphans?: boolean;
 };
 
 export async function getTrip(
@@ -48,8 +53,10 @@ export async function getTrip(
 ): Promise<{ content: Array<{ type: "text"; text: string }>; isError?: boolean }> {
   try {
     const trip = await ctx.tripCache.get(args.trip_key);
+    const format = args.response_format ?? "concise";
     const daySection = args.day ? resolveDay(trip, args.day) : undefined;
-    const text = formatTrip(trip, args.response_format ?? "concise", daySection);
+    const includeOrphans = args.include_orphans ?? (format === "detailed");
+    const text = formatTrip(trip, format, daySection, { includeOrphans });
     return { content: [{ type: "text", text }] };
   } catch (err) {
     const e =

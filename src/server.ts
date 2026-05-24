@@ -90,6 +90,26 @@ import {
   getGuideDescription,
   getGuideInputSchema,
 } from "./tools/get-guide.js";
+import {
+  deleteTrip,
+  deleteTripDescription,
+  deleteTripInputSchema,
+} from "./tools/delete-trip.js";
+import {
+  removeHotel,
+  removeHotelDescription,
+  removeHotelInputSchema,
+} from "./tools/remove-hotel.js";
+import {
+  removeChecklist,
+  removeChecklistDescription,
+  removeChecklistInputSchema,
+} from "./tools/remove-checklist.js";
+import {
+  movePlace,
+  movePlaceDescription,
+  movePlaceInputSchema,
+} from "./tools/move-place.js";
 
 const AUTH_ERROR_RESPONSE = {
   content: [
@@ -338,6 +358,47 @@ export function buildServer(ctx: AppContext): McpServer {
     },
     requireAuth(ctx, async (args) =>
       renameDay(ctx, args as Parameters<typeof renameDay>[1])),
+  );
+
+  server.registerTool(
+    "wanderlog_delete_trip",
+    {
+      title: "Delete a Wanderlog trip",
+      description: deleteTripDescription,
+      inputSchema: deleteTripInputSchema,
+    },
+    requireAuth(ctx, async (args) => deleteTrip(ctx, args as Parameters<typeof deleteTrip>[1])),
+  );
+
+  server.registerTool(
+    "wanderlog_remove_hotel",
+    {
+      title: "Remove a hotel from a Wanderlog trip",
+      description: removeHotelDescription,
+      inputSchema: removeHotelInputSchema,
+    },
+    requireAuth(ctx, async (args) => removeHotel(ctx, args as Parameters<typeof removeHotel>[1])),
+  );
+
+  server.registerTool(
+    "wanderlog_remove_checklist",
+    {
+      title: "Remove a checklist from a Wanderlog trip",
+      description: removeChecklistDescription,
+      inputSchema: removeChecklistInputSchema,
+    },
+    requireAuth(ctx, async (args) =>
+      removeChecklist(ctx, args as Parameters<typeof removeChecklist>[1])),
+  );
+
+  server.registerTool(
+    "wanderlog_move_place",
+    {
+      title: "Move a place to a different day",
+      description: movePlaceDescription,
+      inputSchema: movePlaceInputSchema,
+    },
+    requireAuth(ctx, async (args) => movePlace(ctx, args as Parameters<typeof movePlace>[1])),
   );
 
   return server;

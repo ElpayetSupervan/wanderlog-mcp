@@ -322,8 +322,8 @@ export function buildServer(ctx: AppContext, options?: { tier?: Tier }): McpServ
   );
 
   server.registerTool(
-    "wanderlog_expenses",
-    { title: "Manage expenses (list/remove/update)", description: expensesDescription, inputSchema: expensesInputSchema },
+    "wanderlog_budget",
+    { title: "List, remove, or update trip expenses", description: "Manage budget expenses. action='list' shows all with orphan detection. action='remove' deletes by expense_id, description, or place_ref (bulk). action='update' modifies amount/category/place.", inputSchema: expensesInputSchema },
     requireAuth(ctx, async (args) => expenses(ctx, args as Parameters<typeof expenses>[1])),
   );
 
